@@ -114,10 +114,45 @@ class DolbyRepository(private val context: Context) : AutoCloseable {
                 val volumeLeveler = prefs.getBoolean(DolbyConstants.PREF_VOLUME, false)
                 dolbyEffect.setDapParameter(DsParam.VOLUME_LEVELER_ENABLE, volumeLeveler, profile)
             }
+
+            applyTuningExtras(prefs, profile)
             
             DolbyConstants.dlog(TAG, "Successfully restored all settings for profile $profile")
         } catch (e: Exception) {
             DolbyConstants.dlog(TAG, "Failed to restore profile settings: ${e.message}")
+        }
+    }
+
+    // Only values the user changed are written back, so untouched profiles keep the stock tuning
+    // from dax-default.xml. Each one is applied on its own so a rejected one does not skip the rest.
+    private fun applyTuningExtras(prefs: SharedPreferences, profile: Int) {
+        fun apply(key: String, param: DsParam, value: () -> Int) {
+            if (!prefs.contains(key)) return
+            try {
+                dolbyEffect.setDapParameter(param, value(), profile)
+            } catch (e: Exception) {
+                DolbyConstants.dlog(TAG, "Failed to restore $param: ${e.message}")
+            }
+        }
+        apply(DolbyConstants.PREF_IEQ_AMOUNT, DsParam.IEQ_AMOUNT) {
+            prefs.getInt(DolbyConstants.PREF_IEQ_AMOUNT, 0)
+        }
+        apply(DolbyConstants.PREF_VIRTUAL_BASS, DsParam.VIRTUAL_BASS_ENABLE) {
+            if (prefs.getBoolean(DolbyConstants.PREF_VIRTUAL_BASS, false)) 1 else 0
+        }
+        apply(DolbyConstants.PREF_GEQ_ENABLE, DsParam.GEQ_ENABLE) {
+            if (prefs.getBoolean(DolbyConstants.PREF_GEQ_ENABLE, true)) 1 else 0
+        }
+        apply(DolbyConstants.PREF_REVERB_SUPPRESSION, DsParam.REVERB_SUPPRESSION_ENABLE) {
+            if (prefs.getBoolean(DolbyConstants.PREF_REVERB_SUPPRESSION, false)) 1 else 0
+        }
+        apply(DolbyConstants.PREF_REVERB_SUPPRESSION_AMOUNT, DsParam.REVERB_SUPPRESSION_AMOUNT) {
+            prefs.getInt(DolbyConstants.PREF_REVERB_SUPPRESSION_AMOUNT, 0)
+        }
+        if (volumeLevelerSupported) {
+            apply(DolbyConstants.PREF_VOLUME_LEVELER_AMOUNT, DsParam.VOLUME_LEVELER_AMOUNT) {
+                prefs.getInt(DolbyConstants.PREF_VOLUME_LEVELER_AMOUNT, 0)
+            }
         }
     }
 
@@ -576,6 +611,112 @@ class DolbyRepository(private val context: Context) : AutoCloseable {
         } catch (e: Exception) {
             DolbyConstants.dlog(TAG, "Error setting dialogue enhancer amount: ${e.message}")
         }
+    }
+
+    // Saved value first, like the stereo widening amount, then the DAP's own tuning
+    private fun getIntSetting(profile: Int, key: String, param: DsParam, max: Int): Int {
+        val prefs = getProfilePrefs(profile)
+        if (prefs.contains(key)) return prefs.getInt(key, 0).coerceIn(0, max)
+        return try {
+            dolbyEffect.getDapParameterInt(param, profile).coerceIn(0, max)
+        } catch (e: Exception) {
+            DolbyConstants.dlog(TAG, "Error getting $param: ${e.message}")
+            0
+        }
+    }
+
+    private fun setIntSetting(profile: Int, key: String, param: DsParam, value: Int, max: Int) {
+        if (isReleased) return
+        val clamped = value.coerceIn(0, max)
+        try {
+            checkEffect()
+            dolbyEffect.setDapParameter(param, clamped, profile)
+            getProfilePrefs(profile).edit().putInt(key, clamped).apply()
+        } catch (e: Exception) {
+            DolbyConstants.dlog(TAG, "Error setting $param: ${e.message}")
+        }
+    }
+
+    private fun getBoolSetting(profile: Int, key: String, param: DsParam): Boolean {
+        val prefs = getProfilePrefs(profile)
+        if (prefs.contains(key)) return prefs.getBoolean(key, false)
+        return try {
+            dolbyEffect.getDapParameterBool(param, profile)
+        } catch (e: Exception) {
+            DolbyConstants.dlog(TAG, "Error getting $param: ${e.message}")
+            false
+        }
+    }
+
+    private fun setBoolSetting(profile: Int, key: String, param: DsParam, enabled: Boolean) {
+        if (isReleased) return
+        try {
+            checkEffect()
+            dolbyEffect.setDapParameter(param, enabled, profile)
+            getProfilePrefs(profile).edit().putBoolean(key, enabled).apply()
+        } catch (e: Exception) {
+            DolbyConstants.dlog(TAG, "Error setting $param: ${e.message}")
+        }
+    }
+
+    fun getIeqAmount(profile: Int): Int = getIntSetting(
+        profile, DolbyConstants.PREF_IEQ_AMOUNT, DsParam.IEQ_AMOUNT, DolbyConstants.IEQ_AMOUNT_MAX
+    )
+
+    fun setIeqAmount(profile: Int, amount: Int) = setIntSetting(
+        profile, DolbyConstants.PREF_IEQ_AMOUNT, DsParam.IEQ_AMOUNT, amount,
+        DolbyConstants.IEQ_AMOUNT_MAX
+    )
+
+    fun getVirtualBassEnabled(profile: Int): Boolean = getBoolSetting(
+        profile, DolbyConstants.PREF_VIRTUAL_BASS, DsParam.VIRTUAL_BASS_ENABLE
+    )
+
+    fun setVirtualBassEnabled(profile: Int, enabled: Boolean) = setBoolSetting(
+        profile, DolbyConstants.PREF_VIRTUAL_BASS, DsParam.VIRTUAL_BASS_ENABLE, enabled
+    )
+
+    // Master switch for the 20 band graphic EQ curve
+    fun getGeqEnabled(profile: Int): Boolean = getBoolSetting(
+        profile, DolbyConstants.PREF_GEQ_ENABLE, DsParam.GEQ_ENABLE
+    )
+
+    fun setGeqEnabled(profile: Int, enabled: Boolean) = setBoolSetting(
+        profile, DolbyConstants.PREF_GEQ_ENABLE, DsParam.GEQ_ENABLE, enabled
+    )
+
+    fun getReverbSuppressionEnabled(profile: Int): Boolean = getBoolSetting(
+        profile, DolbyConstants.PREF_REVERB_SUPPRESSION, DsParam.REVERB_SUPPRESSION_ENABLE
+    )
+
+    fun setReverbSuppressionEnabled(profile: Int, enabled: Boolean) = setBoolSetting(
+        profile, DolbyConstants.PREF_REVERB_SUPPRESSION, DsParam.REVERB_SUPPRESSION_ENABLE, enabled
+    )
+
+    fun getReverbSuppressionAmount(profile: Int): Int = getIntSetting(
+        profile, DolbyConstants.PREF_REVERB_SUPPRESSION_AMOUNT, DsParam.REVERB_SUPPRESSION_AMOUNT,
+        DolbyConstants.REVERB_SUPPRESSION_AMOUNT_MAX
+    )
+
+    fun setReverbSuppressionAmount(profile: Int, amount: Int) = setIntSetting(
+        profile, DolbyConstants.PREF_REVERB_SUPPRESSION_AMOUNT, DsParam.REVERB_SUPPRESSION_AMOUNT,
+        amount, DolbyConstants.REVERB_SUPPRESSION_AMOUNT_MAX
+    )
+
+    fun getVolumeLevelerAmount(profile: Int): Int {
+        if (!volumeLevelerSupported) return 0
+        return getIntSetting(
+            profile, DolbyConstants.PREF_VOLUME_LEVELER_AMOUNT, DsParam.VOLUME_LEVELER_AMOUNT,
+            DolbyConstants.VOLUME_LEVELER_AMOUNT_MAX
+        )
+    }
+
+    fun setVolumeLevelerAmount(profile: Int, amount: Int) {
+        if (!volumeLevelerSupported) return
+        setIntSetting(
+            profile, DolbyConstants.PREF_VOLUME_LEVELER_AMOUNT, DsParam.VOLUME_LEVELER_AMOUNT,
+            amount, DolbyConstants.VOLUME_LEVELER_AMOUNT_MAX
+        )
     }
 
     fun getEqualizerGains(profile: Int, bandMode: BandMode): List<BandGain> {

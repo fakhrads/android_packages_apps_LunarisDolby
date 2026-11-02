@@ -171,4 +171,56 @@
     <string name="dolby_mid_enhancer">Peningkat mid</string>
     <string name="dolby_mid_level">Tingkat mid</string>
     <string name="dolby_mid_enhancer_summary">Meningkatkan frekuensi menengah untuk vokal dan instrumen yang lebih jernih</string>
+    <!-- Home -->
+    <string name="dolby_status_speaker">Speaker</string>
+    <string name="dolby_status_headphones">Headphone</string>
+    <string name="dolby_status_lab">Sound Lab</string>
+    <string name="dolby_quick_features">Fitur suara</string>
+    <string name="dolby_tile_on">Aktif</string>
+    <string name="dolby_tile_off">Nonaktif</string>
+    <string name="dolby_ieq_amount">Intensitas</string>
+
+    <!-- Extra DAP controls -->
+    <string name="dolby_virtual_bass">Bass virtual</string>
+    <string name="dolby_virtual_bass_summary">Menambah harmonik bass yang tidak bisa dimainkan speaker sendiri</string>
+    <string name="dolby_reverb_suppression">Peredam gema</string>
+    <string name="dolby_reverb_suppression_summary">Mengurangi gema ruangan agar suara terdengar lebih dekat</string>
+    <string name="dolby_reverb_suppression_amount">Kekuatan peredam</string>
+    <string name="dolby_volume_leveler_amount">Kekuatan penyeimbang</string>
+    <string name="dolby_geq_enable">Equalizer grafis</string>
+    <string name="dolby_geq_enable_summary">Menyalakan atau mematikan kurva dari Equalizer</string>
+    <string name="dolby_processing">Pemrosesan Dolby</string>
+
+    <!-- Sound Lab -->
+    <string name="lab">Lab</string>
+    <string name="lab_title">Sound Lab</string>
+    <string name="lab_summary">Preamp, kompresor, limiter, dan penguat volume di atas Dolby</string>
+    <string name="lab_enable">Gunakan Sound Lab</string>
+    <string name="lab_open">Buka</string>
+    <string name="lab_chain">Alur sinyal</string>
+    <string name="lab_presets">Preset</string>
+    <string name="lab_preset_natural">Natural</string>
+    <string name="lab_preset_punchy">Nendang</string>
+    <string name="lab_preset_vocal">Vokal</string>
+    <string name="lab_preset_night">Malam</string>
+    <string name="lab_preset_loud">Keras</string>
+    <string name="lab_preset_custom">Kustom</string>
+    <string name="lab_tone">Nada</string>
+    <string name="lab_preamp">Preamp</string>
+    <string name="lab_bass">Penguat bass</string>
+    <string name="lab_clarity">Kejernihan</string>
+    <string name="lab_dynamics">Dinamika</string>
+    <string name="lab_compressor">Kompresor multiband</string>
+    <string name="lab_compressor_summary">Meratakan bagian keras dan pelan di nada rendah, tengah dan tinggi</string>
+    <string name="lab_compressor_amount">Intensitas</string>
+    <string name="lab_limiter">Limiter</string>
+    <string name="lab_limiter_summary">Mencegah puncak suara pecah setelah dikuatkan</string>
+    <string name="lab_limiter_ceiling">Batas atas</string>
+    <string name="lab_loudness">Penguat volume</string>
+    <string name="lab_loudness_amount">Penguatan</string>
+    <string name="lab_loudness_warning">Penguatan tinggi bisa membuat speaker kecil pecah. Biarkan limiter tetap aktif.</string>
+    <string name="lab_footer">Sound Lab memakai efek DynamicsProcessing dan LoudnessEnhancer bawaan Android dan tetap jalan walau Dolby mati.</string>
+    <string name="lab_stage_eq">EQ</string>
+    <string name="lab_stage_compressor">Kompresor</string>
+    <string name="lab_stage_boost">Boost</string>
 </resources>

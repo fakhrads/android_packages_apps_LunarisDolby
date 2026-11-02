@@ -31,22 +31,41 @@ object DolbyConstants {
     const val PREF_PRESETS_MIGRATED = "presets_migrated"
     const val PREF_BAND_MODE = "dolby_band_mode"
     const val PREF_DEVICE_STATE_MEMORY = "device_state_memory_enabled"
+    const val PREF_IEQ_AMOUNT = "dolby_ieq_amount"
+    const val PREF_VIRTUAL_BASS = "dolby_virtual_bass"
+    const val PREF_GEQ_ENABLE = "dolby_geq_enable"
+    const val PREF_REVERB_SUPPRESSION = "dolby_reverb_suppression"
+    const val PREF_REVERB_SUPPRESSION_AMOUNT = "dolby_reverb_suppression_amount"
+    const val PREF_VOLUME_LEVELER_AMOUNT = "dolby_volume_leveler_amount"
     
     const val PREF_FILE_PRESETS = "presets"
 
+    // IDs from the stock HyperOS DAX3 table (MiSound), checked on onyx by reading the values
+    // back against odm/vendor etc/dolby/dax-default.xml
     enum class DsParam(val id: Int, val length: Int = 1) {
         HEADPHONE_VIRTUALIZER(101),
         SPEAKER_VIRTUALIZER(102),
         VOLUME_LEVELER_ENABLE(103),
         IEQ_PRESET(104),
         DIALOGUE_ENHANCER_ENABLE(105),
+        GEQ_ENABLE(106),
+        IEQ_AMOUNT(107),
         DIALOGUE_ENHANCER_AMOUNT(108),
         GEQ_BAND_GAINS(110, 20),
         BASS_ENHANCER_ENABLE(111),
-        STEREO_WIDENING_AMOUNT(113);
+        VIRTUAL_BASS_ENABLE(112),
+        STEREO_WIDENING_AMOUNT(113),
+        REVERB_SUPPRESSION_ENABLE(114),
+        REVERB_SUPPRESSION_AMOUNT(115),
+        VOLUME_LEVELER_AMOUNT(116);
 
         override fun toString(): String = "${name}(${id})"
     }
+
+    // Ranges the DAP accepts on onyx: larger values are clamped by the effect
+    const val IEQ_AMOUNT_MAX = 10
+    const val REVERB_SUPPRESSION_AMOUNT_MAX = 9
+    const val VOLUME_LEVELER_AMOUNT_MAX = 10
 
     fun dlog(tag: String, msg: String) {
         if (Log.isLoggable(TAG, Log.DEBUG) || Log.isLoggable(tag, Log.DEBUG)) {

@@ -38,6 +38,7 @@ fun FloatingNavToolbar(
     val isHomeSelected = currentRoute == "settings"
     val isEqualizerSelected = currentRoute == "equalizer"
     val isAdvancedSelected = currentRoute == "advanced"
+    val isLabSelected = currentRoute == "lab"
     
     val containerColor = MaterialTheme.colorScheme.primaryContainer
     val onContainerColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -99,6 +100,22 @@ fun FloatingNavToolbar(
                 }
             )
             
+            NavToolbarItem(
+                icon = Icons.Default.Science,
+                label = stringResource(R.string.lab),
+                selected = isLabSelected,
+                primaryColor = primaryColor,
+                onPrimaryColor = onPrimaryColor,
+                containerColor = containerColor,
+                onContainerColor = onContainerColor,
+                onClick = {
+                    scope.launch {
+                        haptic.performHaptic(HapticFeedbackHelper.HapticIntensity.DOUBLE_CLICK)
+                    }
+                    onNavigate("lab")
+                }
+            )
+
             NavToolbarItem(
                 icon = Icons.Default.Settings,
                 label = stringResource(R.string.advanced),

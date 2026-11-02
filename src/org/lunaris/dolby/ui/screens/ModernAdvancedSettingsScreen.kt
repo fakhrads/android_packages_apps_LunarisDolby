@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import org.lunaris.dolby.DolbyConstants
 import org.lunaris.dolby.R
 import org.lunaris.dolby.domain.models.DolbyUiState
 import org.lunaris.dolby.ui.components.*
@@ -280,6 +281,19 @@ private fun ModernAdvancedSettingsContent(
                         onCheckedChange = { viewModel.setVolumeLeveler(it) },
                         icon = Icons.Default.BarChart
                     )
+
+                    AnimatedVisibility(visible = state.settings.volumeLevelerEnabled) {
+                        Column {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            ModernSettingSlider(
+                                title = stringResource(R.string.dolby_volume_leveler_amount),
+                                value = state.profileSettings.volumeLevelerAmount,
+                                onValueChange = { viewModel.setVolumeLevelerAmount(it.toInt()) },
+                                valueRange = 0f..DolbyConstants.VOLUME_LEVELER_AMOUNT_MAX.toFloat(),
+                                steps = DolbyConstants.VOLUME_LEVELER_AMOUNT_MAX - 1
+                            )
+                        }
+                    }
                 }
             }
             
@@ -322,6 +336,52 @@ private fun ModernAdvancedSettingsContent(
                     }
                 }
                 
+                item {
+                    ModernSettingsCard(
+                        title = stringResource(R.string.dolby_processing),
+                        icon = Icons.Default.AutoAwesome
+                    ) {
+                        ModernSettingSwitch(
+                            title = stringResource(R.string.dolby_virtual_bass),
+                            subtitle = stringResource(R.string.dolby_virtual_bass_summary),
+                            checked = state.profileSettings.virtualBassEnabled,
+                            onCheckedChange = { viewModel.setVirtualBass(it) },
+                            icon = Icons.Default.Speaker
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        ModernSettingSwitch(
+                            title = stringResource(R.string.dolby_reverb_suppression),
+                            subtitle = stringResource(R.string.dolby_reverb_suppression_summary),
+                            checked = state.profileSettings.reverbSuppressionEnabled,
+                            onCheckedChange = { viewModel.setReverbSuppression(it) },
+                            icon = Icons.Default.BlurOn
+                        )
+
+                        AnimatedVisibility(visible = state.profileSettings.reverbSuppressionEnabled) {
+                            Column {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                ModernSettingSlider(
+                                    title = stringResource(R.string.dolby_reverb_suppression_amount),
+                                    value = state.profileSettings.reverbSuppressionAmount,
+                                    onValueChange = { viewModel.setReverbSuppressionAmount(it.toInt()) },
+                                    valueRange = 0f..DolbyConstants.REVERB_SUPPRESSION_AMOUNT_MAX.toFloat(),
+                                    steps = DolbyConstants.REVERB_SUPPRESSION_AMOUNT_MAX - 1
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        ModernSettingSwitch(
+                            title = stringResource(R.string.dolby_geq_enable),
+                            subtitle = stringResource(R.string.dolby_geq_enable_summary),
+                            checked = state.profileSettings.geqEnabled,
+                            onCheckedChange = { viewModel.setGeqEnabled(it) },
+                            icon = Icons.Default.Equalizer
+                        )
+                    }
+                }
+
                 item {
                     ModernSettingsCard(
                         title = stringResource(R.string.dolby_dialogue_enhancer),

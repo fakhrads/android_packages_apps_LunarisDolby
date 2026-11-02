@@ -9,6 +9,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import org.lunaris.dolby.DolbyConstants
+import org.lunaris.dolby.audio.SoundLab
 import org.lunaris.dolby.data.DolbyRepository
 import org.lunaris.dolby.domain.models.*
 import org.lunaris.dolby.service.DolbyEffectService
@@ -24,6 +25,7 @@ class DolbyViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow<DolbyUiState>(DolbyUiState.Loading)
     val uiState: StateFlow<DolbyUiState> = _uiState.asStateFlow()
     val currentProfile: StateFlow<Int> = repository.currentProfile
+    val volumeLevelerSupported: Boolean = repository.volumeLevelerSupported
     
     private var speakerStateJob: Job? = null
     private var profileChangeJob: Job? = null
@@ -31,6 +33,8 @@ class DolbyViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         DolbyConstants.dlog(TAG, "ViewModel initialized")
+        // Home shows the Sound Lab state, which may not be loaded yet after a process restart
+        SoundLab.applySaved(application)
         loadSettings()
         observeSpeakerState()
         observeProfileChanges()
@@ -91,7 +95,13 @@ class DolbyViewModel(application: Application) : AndroidViewModel(application) {
                     bassLevel = repository.getBassLevel(profile),
                     midLevel = repository.getMidLevel(profile),
                     trebleLevel = repository.getTrebleLevel(profile),
-                    bassCurve = repository.getBassCurve(profile)
+                    bassCurve = repository.getBassCurve(profile),
+                    ieqAmount = repository.getIeqAmount(profile),
+                    virtualBassEnabled = repository.getVirtualBassEnabled(profile),
+                    geqEnabled = repository.getGeqEnabled(profile),
+                    reverbSuppressionEnabled = repository.getReverbSuppressionEnabled(profile),
+                    reverbSuppressionAmount = repository.getReverbSuppressionAmount(profile),
+                    volumeLevelerAmount = repository.getVolumeLevelerAmount(profile)
                 )
                 
                 if (!isCleared) {
@@ -291,6 +301,41 @@ class DolbyViewModel(application: Application) : AndroidViewModel(application) {
                 DolbyConstants.dlog(TAG, "Error setting dialogue enhancer amount: ${e.message}")
             }
         }
+    }
+
+    private fun updateProfile(what: String, block: (Int) -> Unit) {
+        viewModelScope.launch {
+            try {
+                block(repository.getCurrentProfile())
+                loadSettings()
+            } catch (e: Exception) {
+                DolbyConstants.dlog(TAG, "Error setting $what: ${e.message}")
+            }
+        }
+    }
+
+    fun setIeqAmount(amount: Int) = updateProfile("IEQ amount") {
+        repository.setIeqAmount(it, amount)
+    }
+
+    fun setVirtualBass(enabled: Boolean) = updateProfile("virtual bass") {
+        repository.setVirtualBassEnabled(it, enabled)
+    }
+
+    fun setGeqEnabled(enabled: Boolean) = updateProfile("graphic EQ") {
+        repository.setGeqEnabled(it, enabled)
+    }
+
+    fun setReverbSuppression(enabled: Boolean) = updateProfile("reverb suppression") {
+        repository.setReverbSuppressionEnabled(it, enabled)
+    }
+
+    fun setReverbSuppressionAmount(amount: Int) = updateProfile("reverb suppression amount") {
+        repository.setReverbSuppressionAmount(it, amount)
+    }
+
+    fun setVolumeLevelerAmount(amount: Int) = updateProfile("volume leveler amount") {
+        repository.setVolumeLevelerAmount(it, amount)
     }
 
     fun resetAllProfiles() {

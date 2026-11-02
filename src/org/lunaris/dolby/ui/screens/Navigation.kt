@@ -15,11 +15,13 @@ import androidx.navigation.compose.rememberNavController
 import org.lunaris.dolby.ui.viewmodel.AppProfileViewModel
 import org.lunaris.dolby.ui.viewmodel.DolbyViewModel
 import org.lunaris.dolby.ui.viewmodel.EqualizerViewModel
+import org.lunaris.dolby.ui.viewmodel.LabViewModel
 
 sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object Equalizer : Screen("equalizer")
     object Advanced : Screen("advanced")
+    object Lab : Screen("lab")
     object AppProfiles : Screen("app_profiles")
     object ImportExport : Screen("import_export")
 }
@@ -60,6 +62,20 @@ fun DolbyNavHost(
             )
         }
         
+        composable(Screen.Lab.route) {
+            val context = LocalContext.current
+            val labViewModel: LabViewModel = viewModel(
+                factory = androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(
+                    context.applicationContext as android.app.Application
+                )
+            )
+
+            SoundLabScreen(
+                viewModel = labViewModel,
+                navController = navController
+            )
+        }
+
         composable(Screen.AppProfiles.route) {
             val context = LocalContext.current
             val appProfileViewModel: AppProfileViewModel = viewModel(

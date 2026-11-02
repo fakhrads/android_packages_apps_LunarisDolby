@@ -17,12 +17,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import org.lunaris.dolby.DolbyConstants
 import org.lunaris.dolby.R
+import org.lunaris.dolby.audio.SoundLab
 import org.lunaris.dolby.domain.models.DolbyUiState
 import org.lunaris.dolby.ui.components.*
 import org.lunaris.dolby.ui.viewmodel.DolbyViewModel
@@ -202,14 +205,23 @@ private fun ModernDolbySettingsContent(
     navController: NavController,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val lab by SoundLab.state.collectAsState()
+    val settings = state.settings
+    val profileSettings = state.profileSettings
+    val profileTuning = settings.enabled && settings.currentProfile != 0
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            DolbyMainCard(
-                enabled = state.settings.enabled,
+            DolbyHeroCard(
+                enabled = settings.enabled,
+                profile = settings.currentProfile,
+                isOnSpeaker = state.isOnSpeaker,
+                labEnabled = lab.enabled,
                 onEnabledChange = { viewModel.setDolbyEnabled(it) }
             )
         }
@@ -245,8 +257,100 @@ private fun ModernDolbySettingsContent(
                         currentPreset = state.profileSettings.ieqPreset,
                         onPresetChange = { viewModel.setIeqPreset(it) }
                     )
+                    AnimatedVisibility(visible = profileSettings.ieqPreset != 0) {
+                        Column {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            ModernSettingSlider(
+                                title = stringResource(R.string.dolby_ieq_amount),
+                                value = profileSettings.ieqAmount,
+                                onValueChange = { viewModel.setIeqAmount(it.toInt()) },
+                                valueRange = 0f..DolbyConstants.IEQ_AMOUNT_MAX.toFloat(),
+                                steps = DolbyConstants.IEQ_AMOUNT_MAX - 1
+                            )
+                        }
+                    }
                 }
             }
+        }
+
+        item {
+            AnimatedVisibility(
+                visible = settings.enabled,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                val tiles = buildList {
+                    if (viewModel.volumeLevelerSupported) {
+                        add(FeatureTileItem(
+                            icon = Icons.Default.BarChart,
+                            title = stringResource(R.string.dolby_volume_leveler),
+                            checked = settings.volumeLevelerEnabled,
+                            onToggle = { viewModel.setVolumeLeveler(it) }
+                        ))
+                    }
+                    if (profileTuning) {
+                        add(FeatureTileItem(
+                            icon = Icons.Default.RecordVoiceOver,
+                            title = stringResource(R.string.dolby_dialogue_enhancer),
+                            checked = profileSettings.dialogueEnhancerEnabled,
+                            onToggle = { viewModel.setDialogueEnhancer(it) }
+                        ))
+                        add(FeatureTileItem(
+                            icon = Icons.Default.Speaker,
+                            title = stringResource(R.string.dolby_virtual_bass),
+                            checked = profileSettings.virtualBassEnabled,
+                            onToggle = { viewModel.setVirtualBass(it) }
+                        ))
+                        add(FeatureTileItem(
+                            icon = Icons.Default.BlurOn,
+                            title = stringResource(R.string.dolby_reverb_suppression),
+                            checked = profileSettings.reverbSuppressionEnabled,
+                            onToggle = { viewModel.setReverbSuppression(it) }
+                        ))
+                        if (state.isOnSpeaker) {
+                            add(FeatureTileItem(
+                                icon = Icons.Default.SurroundSound,
+                                title = stringResource(R.string.dolby_spk_virtualizer),
+                                checked = profileSettings.speakerVirtualizerEnabled,
+                                onToggle = { viewModel.setSpeakerVirtualizer(it) }
+                            ))
+                        } else {
+                            add(FeatureTileItem(
+                                icon = Icons.Default.Headphones,
+                                title = stringResource(R.string.dolby_hp_virtualizer),
+                                checked = profileSettings.headphoneVirtualizerEnabled,
+                                onToggle = { viewModel.setHeadphoneVirtualizer(it) }
+                            ))
+                        }
+                        add(FeatureTileItem(
+                            icon = Icons.Default.Equalizer,
+                            title = stringResource(R.string.dolby_geq_enable),
+                            checked = profileSettings.geqEnabled,
+                            onToggle = { viewModel.setGeqEnabled(it) }
+                        ))
+                    }
+                }
+                if (tiles.isNotEmpty()) {
+                    FeatureTileGrid(
+                        title = stringResource(R.string.dolby_quick_features),
+                        tiles = tiles
+                    )
+                }
+            }
+        }
+
+        item {
+            SoundLabEntryCard(
+                enabled = lab.enabled,
+                onEnabledChange = { enabled -> SoundLab.update(context) { it.copy(enabled = enabled) } },
+                onOpen = {
+                    navController.navigate(Screen.Lab.route) {
+                        popUpTo("settings") { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            )
         }
 
         item {

@@ -11,6 +11,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.util.Log
+import org.lunaris.dolby.audio.SoundLab
 import org.lunaris.dolby.data.DolbyRepository
 import org.lunaris.dolby.service.AppProfileMonitorService
 import org.lunaris.dolby.service.DolbyEffectService
@@ -27,6 +28,7 @@ class BootCompletedReceiver : BroadcastReceiver() {
                     val repository = DolbyRepository(context)
                     
                     DolbyEffectService.start(context)
+                    SoundLab.applySaved(context)
                     
                     val prefs = context.getSharedPreferences("dolby_prefs", Context.MODE_PRIVATE)
                     if (prefs.getBoolean("app_profile_monitoring_enabled", false)) {
