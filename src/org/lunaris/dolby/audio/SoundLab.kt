@@ -612,13 +612,16 @@ object SoundLab {
     }
 
     // Amount 0..100 moves the threshold from -10 to -30 dB and the ratio from 1.5:1 to 5:1, with
-    // half of the gain reduction made up again so the level stays about the same
+    // half of the gain reduction made up again so the level stays about the same.
+    // The vendor effect refuses MBC bands while the stage is disabled, which failed the whole
+    // setup, so the stage stays enabled and off is 1:1 with no makeup: the level is unchanged.
     private fun compressor(s: Settings): DynamicsProcessing.Mbc {
         val f = s.compressorAmount / 100f
-        val threshold = -10f - 20f * f
-        val ratio = 1.5f + 3.5f * f
-        val makeup = min(9f, -threshold * (1f - 1f / ratio) * 0.5f)
-        val mbc = DynamicsProcessing.Mbc(true, s.compressorEnabled, MBC_CUTOFFS.size)
+        val on = s.compressorEnabled
+        val threshold = if (on) -10f - 20f * f else 0f
+        val ratio = if (on) 1.5f + 3.5f * f else 1f
+        val makeup = if (on) min(9f, -threshold * (1f - 1f / ratio) * 0.5f) else 0f
+        val mbc = DynamicsProcessing.Mbc(true, true, MBC_CUTOFFS.size)
         for (i in MBC_CUTOFFS.indices) {
             mbc.setBand(i, DynamicsProcessing.MbcBand(
                 true, MBC_CUTOFFS[i], MBC_ATTACK_MS[i], MBC_RELEASE_MS[i], ratio, threshold,
