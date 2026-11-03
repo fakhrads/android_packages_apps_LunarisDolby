@@ -12,7 +12,6 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.AudioPlaybackConfiguration
 import android.media.audiofx.DynamicsProcessing
-import android.media.audiofx.LoudnessEnhancer
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
@@ -33,12 +32,16 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
- * Global post processing on top of the Dolby DAP, built from the AOSP DynamicsProcessing and
- * LoudnessEnhancer effects on the output mix (session 0). Both run in the audio HAL's AIDL effect
- * factory, so nothing native is shipped here.
+ * Global post processing on top of the Dolby DAP, built from the AOSP DynamicsProcessing effect on
+ * the output mix (session 0). It runs in the audio HAL's AIDL effect factory, so nothing native is
+ * shipped here.
  *
- * Chain: preamp -> EQ (10 band graphic EQ plus the headphone correction) -> multiband compressor
- * -> limiter, then the loudness boost.
+ * Chain: preamp plus loudness boost -> EQ (10 band graphic EQ plus the headphone correction) ->
+ * multiband compressor -> limiter.
+ *
+ * The boost is input gain caught by the limiter, not the AOSP LoudnessEnhancer: that one sits
+ * before DynamicsProcessing (insert first) and squeezes anything over about -9 dBFS at 7:1, so
+ * on full scale input (Bluetooth absolute volume, high volume) it barely got louder.
  *
  * DynamicsProcessing runs its EQ on FFT bins and gives each bin the gain of the band it falls in,
  * so the EQ curve is sampled onto bands that follow the bins: one band per bin in the lows, log
@@ -174,7 +177,6 @@ object SoundLab {
     private val refusedEngines = mutableSetOf<Engine>()
     private var appliedGains: FloatArray? = null
     private var appliedDynamics: Settings? = null
-    private var loudness: LoudnessEnhancer? = null
     private var callbacksRegistered = false
 
     private val worker by lazy { Handler(HandlerThread(TAG).apply { start() }.looper) }
@@ -421,7 +423,7 @@ object SoundLab {
 
     private fun apply(context: Context, s: Settings) = synchronized(lock) {
         if (!s.enabled) {
-            releaseLocked()
+            releaseDynamicsLocked()
             _status.value = Status()
             return@synchronized
         }
@@ -456,23 +458,6 @@ object SoundLab {
             onHeadphones = onHeadphones,
             precisionUnavailable = wanted == Engine.PRECISION && Engine.PRECISION in refusedEngines
         )
-        try {
-            if (s.loudnessMb > 0) {
-                val le = loudness?.takeIf { it.hasControl() } ?: LoudnessEnhancer(0).also {
-                    loudness?.let { old -> runCatching { old.release() } }
-                    loudness = it
-                }
-                le.setTargetGain(s.loudnessMb)
-                le.enabled = true
-            } else {
-                loudness?.let { runCatching { it.release() } }
-                loudness = null
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to apply loudness boost: ${e.message}")
-            loudness?.let { runCatching { it.release() } }
-            loudness = null
-        }
     }
 
     /** Sets everything on the effect for [engine]; returns the preamp. Throws if the effect refuses. */
@@ -503,7 +488,8 @@ object SoundLab {
             }
         }
         appliedGains = gains
-        dp.setInputGainAllChannelsTo(preamp)
+        val inputGain = preamp + s.loudnessMb / 100f
+        dp.setInputGainAllChannelsTo(inputGain)
         val dynamicsKey = Settings(
             compressorEnabled = s.compressorEnabled, compressorAmount = s.compressorAmount,
             limiterEnabled = s.limiterEnabled, limiterCeilingDb = s.limiterCeilingDb
@@ -513,14 +499,14 @@ object SoundLab {
             dp.setLimiterAllChannelsTo(limiter(s))
             appliedDynamics = dynamicsKey
         }
-        if (fresh) verifyLocked(dp, layout, gains, preamp)
+        if (fresh) verifyLocked(dp, layout, gains, inputGain)
         dp.enabled = true
         return preamp
     }
 
     // The effect reports refused parameters as exceptions, but read a middle band, the top band
-    // and the preamp back as well: the getters query the effect, not a cache
-    private fun verifyLocked(dp: DynamicsProcessing, layout: EqLayout, gains: FloatArray, preamp: Float) {
+    // and the input gain back as well: the getters query the effect, not a cache
+    private fun verifyLocked(dp: DynamicsProcessing, layout: EqLayout, gains: FloatArray, inputGain: Float) {
         for (i in intArrayOf(layout.size / 2, layout.size - 1)) {
             for (ch in 0 until 2) {
                 val band = dp.getPreEqBandByChannelIndex(ch, i)
@@ -530,7 +516,7 @@ object SoundLab {
             }
         }
         val input = dp.getInputGainByChannelIndex(0)
-        check(abs(input - preamp) < 0.05f) { "input gain reads $input dB" }
+        check(abs(input - inputGain) < 0.05f) { "input gain reads $input dB" }
     }
 
     // Recreated when the audio server dropped it, another app took control of the session, or
@@ -634,12 +620,6 @@ object SoundLab {
     private fun limiter(s: Settings) = DynamicsProcessing.Limiter(
         true, s.limiterEnabled, 0, 1f, 60f, 10f, s.limiterCeilingDb.toFloat(), 0f
     )
-
-    private fun releaseLocked() {
-        releaseDynamicsLocked()
-        loudness?.let { runCatching { it.release() } }
-        loudness = null
-    }
 
     private fun isOnHeadphones(context: Context): Boolean = try {
         val audioManager = context.getSystemService(AudioManager::class.java)
