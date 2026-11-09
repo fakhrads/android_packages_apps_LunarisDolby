@@ -102,12 +102,15 @@ class BluetoothAudio(context: Context, private val scope: CoroutineScope) {
         a2dp = null
     }
 
+    /** BluetoothA2dp.getActiveDevice is hidden; the adapter's system API gives the same device. */
+    private fun activeDevice(): BluetoothDevice? = adapter?.getActiveDevices(BluetoothProfile.A2DP)?.firstOrNull()
+
     fun refresh() {
         val proxy = a2dp ?: return
         scope.launch(Dispatchers.IO) {
             _state.value =
                 runCatching {
-                        val device = proxy.activeDevice
+                        val device = activeDevice()
                         val status = device?.let { proxy.getCodecStatus(it) }
                         val current = status?.codecConfig
                         if (device == null || status == null || current == null) {
@@ -175,7 +178,7 @@ class BluetoothAudio(context: Context, private val scope: CoroutineScope) {
         val proxy = a2dp ?: return
         scope.launch(Dispatchers.IO) {
             runCatching {
-                    val device = proxy.activeDevice ?: return@runCatching
+                    val device = activeDevice() ?: return@runCatching
                     if (on) proxy.enableOptionalCodecs(device) else proxy.disableOptionalCodecs(device)
                 }
                 .onFailure { Log.w(TAG, "Cannot switch the optional codecs", it) }
@@ -214,7 +217,7 @@ class BluetoothAudio(context: Context, private val scope: CoroutineScope) {
         val proxy = a2dp ?: return
         scope.launch(Dispatchers.IO) {
             runCatching {
-                    val device: BluetoothDevice = proxy.activeDevice ?: return@runCatching
+                    val device: BluetoothDevice = activeDevice() ?: return@runCatching
                     proxy.setCodecConfigPreference(device, config)
                 }
                 .onFailure { Log.w(TAG, "Cannot set the codec config", it) }
@@ -263,7 +266,7 @@ class BluetoothAudio(context: Context, private val scope: CoroutineScope) {
             )
 
         fun codecName(config: BluetoothCodecConfig): String =
-            config.extendedCodecType?.codecName ?: BluetoothCodecConfig.getCodecName(config.codecType)
+            config.extendedCodecType?.codecName ?: "Codec ${config.codecType}"
 
         fun isLdac(config: BluetoothCodecConfig) = codecName(config).contains("LDAC", ignoreCase = true)
 
