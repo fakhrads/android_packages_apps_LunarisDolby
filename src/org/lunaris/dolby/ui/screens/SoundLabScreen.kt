@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import kotlinx.coroutines.launch
 import org.lunaris.dolby.R
+import android.bluetooth.BluetoothCodecConfig
+import org.lunaris.dolby.audio.BluetoothAudio
 import org.lunaris.dolby.audio.CorrectionParser
 import org.lunaris.dolby.audio.SoundLab
 import org.lunaris.dolby.ui.components.*
@@ -52,6 +54,7 @@ fun SoundLabScreen(
     val status by viewModel.status.collectAsState()
     val corrections by viewModel.corrections.collectAsState()
     val userPresets by viewModel.userPresets.collectAsState()
+    val bluetooth by viewModel.bluetoothState.collectAsState()
     val currentRoute by navController.currentBackStackEntryFlow.collectAsState(null)
     val layoutDirection = LocalLayoutDirection.current
     val cutoutInsets = WindowInsets.displayCutout.asPaddingValues()
@@ -84,6 +87,7 @@ fun SoundLabScreen(
                 status = status,
                 corrections = corrections,
                 userPresets = userPresets,
+                bluetooth = bluetooth,
                 viewModel = viewModel,
                 modifier = Modifier.padding(paddingValues)
             )
@@ -137,6 +141,7 @@ private fun SoundLabContent(
     status: SoundLab.Status,
     corrections: List<SoundLab.Correction>,
     userPresets: List<SoundLab.UserPreset>,
+    bluetooth: BluetoothAudio.State,
     viewModel: LabViewModel,
     modifier: Modifier = Modifier
 ) {
@@ -195,6 +200,10 @@ private fun SoundLabContent(
             LabSection(visible = state.enabled) {
                 LoudnessCard(state = state, viewModel = viewModel)
             }
+        }
+
+        item {
+            BluetoothCard(state = bluetooth, viewModel = viewModel)
         }
 
         item {
@@ -799,4 +808,223 @@ private fun LoudnessCard(state: SoundLab.Settings, viewModel: LabViewModel) {
             }
         }
     }
+}
+
+@Composable
+private fun BluetoothCard(state: BluetoothAudio.State, viewModel: LabViewModel) {
+    ModernSettingsCard(
+        title = stringResource(R.string.bt_title),
+        icon = Icons.Default.Bluetooth
+    ) {
+        val current = state.current
+        if (current == null) {
+            Text(
+                text = stringResource(R.string.bt_none),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            return@ModernSettingsCard
+        }
+
+        val capability = state.capability
+        val summary = btFormat(current)
+        Text(
+            text = listOfNotNull(state.deviceName, BluetoothAudio.codecName(current), summary)
+                .filter { it.isNotBlank() }
+                .joinToString(" · "),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        if (state.optionalSupported) {
+            Spacer(modifier = Modifier.height(12.dp))
+            ModernSettingSwitch(
+                title = stringResource(R.string.bt_optional),
+                subtitle = stringResource(R.string.bt_optional_summary),
+                checked = state.optionalEnabled,
+                onCheckedChange = viewModel::setBluetoothOptionalCodecs,
+                icon = Icons.Default.HighQuality
+            )
+        }
+
+        BtGroup(title = stringResource(R.string.bt_codec)) {
+            AssistChip(
+                onClick = viewModel::selectBluetoothAutomatic,
+                label = { Text(stringResource(R.string.bt_codec_auto)) },
+                leadingIcon = {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                },
+                shape = CircleShape
+            )
+            state.selectable.forEach { codec ->
+                FilterChip(
+                    selected = BluetoothAudio.sameCodec(codec, current),
+                    onClick = { viewModel.selectBluetoothCodec(codec) },
+                    label = { Text(BluetoothAudio.codecName(codec)) },
+                    shape = CircleShape
+                )
+            }
+        }
+
+        if (capability != null) {
+            val rates = BluetoothAudio.supported(capability.sampleRate, BluetoothAudio.SAMPLE_RATES)
+            if (rates.size > 1) {
+                BtGroup(title = stringResource(R.string.bt_sample_rate)) {
+                    rates.forEach { (hz, mask) ->
+                        FilterChip(
+                            selected = current.sampleRate == mask,
+                            onClick = { viewModel.setBluetoothSampleRate(mask) },
+                            label = { Text(khz(hz)) },
+                            shape = CircleShape
+                        )
+                    }
+                }
+            }
+
+            val depths = BluetoothAudio.supported(capability.bitsPerSample, BluetoothAudio.BIT_DEPTHS)
+            if (depths.size > 1) {
+                BtGroup(title = stringResource(R.string.bt_bits)) {
+                    depths.forEach { (bits, mask) ->
+                        FilterChip(
+                            selected = current.bitsPerSample == mask,
+                            onClick = { viewModel.setBluetoothBitsPerSample(mask) },
+                            label = { Text(stringResource(R.string.bt_bits_value, bits)) },
+                            shape = CircleShape
+                        )
+                    }
+                }
+            }
+
+            val channels = listOf(
+                R.string.bt_channel_mono to BluetoothCodecConfig.CHANNEL_MODE_MONO,
+                R.string.bt_channel_stereo to BluetoothCodecConfig.CHANNEL_MODE_STEREO
+            ).filter { (capability.channelMode and it.second) != 0 }
+            if (channels.size > 1) {
+                BtGroup(title = stringResource(R.string.bt_channels)) {
+                    channels.forEach { (label, mask) ->
+                        FilterChip(
+                            selected = current.channelMode == mask,
+                            onClick = { viewModel.setBluetoothChannelMode(mask) },
+                            label = { Text(stringResource(label)) },
+                            shape = CircleShape
+                        )
+                    }
+                }
+            }
+        }
+
+        if (BluetoothAudio.isLdac(current)) {
+            val quality = BluetoothAudio.ldacQuality(current)
+            BtGroup(title = stringResource(R.string.bt_ldac_quality)) {
+                listOf(
+                    R.string.bt_ldac_audio to BluetoothAudio.LDAC_QUALITY_AUDIO,
+                    R.string.bt_ldac_balanced to BluetoothAudio.LDAC_QUALITY_BALANCED,
+                    R.string.bt_ldac_connection to BluetoothAudio.LDAC_QUALITY_CONNECTION,
+                    R.string.bt_ldac_adaptive to BluetoothAudio.LDAC_QUALITY_ADAPTIVE
+                ).forEach { (label, value) ->
+                    FilterChip(
+                        selected = quality == value,
+                        onClick = { viewModel.setBluetoothLdacQuality(value) },
+                        label = { Text(stringResource(label)) },
+                        shape = CircleShape
+                    )
+                }
+            }
+        }
+
+        if (BluetoothAudio.isLhdc(current)) {
+            val quality = BluetoothAudio.lhdcQuality(current)
+            val v5 = BluetoothAudio.isLhdcV5(current)
+            // kbps per quality mode of the stack; LHDC V5 has 1000 and 160, V3 has 128 and no 1000
+            val modes = buildList {
+                add(BluetoothAudio.LHDC_QUALITY_ADAPTIVE to null)
+                if (v5) add(8 to 1000)
+                add(7 to 900)
+                add(6 to 500)
+                add(5 to 400)
+                add(4 to 320)
+                add(3 to 256)
+                add(2 to 192)
+                add(1 to if (v5) 160 else 128)
+                add(0 to 64)
+            }
+            BtGroup(title = stringResource(R.string.bt_lhdc_quality)) {
+                modes.forEach { (mode, kbps) ->
+                    FilterChip(
+                        selected = quality == mode,
+                        onClick = { viewModel.setBluetoothLhdcQuality(mode) },
+                        label = {
+                            Text(
+                                if (kbps == null) stringResource(R.string.bt_ldac_adaptive)
+                                else stringResource(R.string.bt_kbps, kbps)
+                            )
+                        },
+                        shape = CircleShape
+                    )
+                }
+            }
+            if (v5) {
+                Spacer(modifier = Modifier.height(12.dp))
+                ModernSettingSwitch(
+                    title = stringResource(R.string.bt_lhdc_ll),
+                    subtitle = stringResource(R.string.bt_lhdc_ll_summary),
+                    checked = BluetoothAudio.lhdcLowLatency(current),
+                    onCheckedChange = viewModel::setBluetoothLhdcLowLatency,
+                    icon = Icons.Default.Speed
+                )
+            }
+        }
+
+        if (BluetoothAudio.isAac(current) && BluetoothAudio.aacVbrSupported(current)) {
+            Spacer(modifier = Modifier.height(12.dp))
+            ModernSettingSwitch(
+                title = stringResource(R.string.bt_aac_vbr),
+                subtitle = stringResource(R.string.bt_aac_vbr_summary),
+                checked = BluetoothAudio.aacVbrEnabled(current),
+                onCheckedChange = viewModel::setBluetoothAacVbr,
+                icon = Icons.Default.Tune
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.bt_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun BtGroup(title: String, chips: @Composable RowScope.() -> Unit) {
+    Spacer(modifier = Modifier.height(16.dp))
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        content = chips
+    )
+}
+
+@Composable
+private fun btFormat(config: BluetoothCodecConfig): String {
+    val rate = BluetoothAudio.SAMPLE_RATES.firstOrNull { it.second == config.sampleRate }?.first
+    val bits = BluetoothAudio.BIT_DEPTHS.firstOrNull { it.second == config.bitsPerSample }?.first
+    return listOfNotNull(
+        rate?.let { khz(it) },
+        bits?.let { stringResource(R.string.bt_bits_value, it) }
+    ).joinToString(" · ")
+}
+
+@Composable
+private fun khz(hz: Int): String {
+    val value = hz / 1000f
+    val text = if (value % 1f == 0f) value.toInt().toString() else value.toString()
+    return stringResource(R.string.bt_khz, text)
 }

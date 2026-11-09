@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.lunaris.dolby.R
+import android.bluetooth.BluetoothCodecConfig
+import org.lunaris.dolby.audio.BluetoothAudio
 import org.lunaris.dolby.audio.SoundLab
 
 class LabViewModel(application: Application) : AndroidViewModel(application) {
@@ -30,9 +32,29 @@ class LabViewModel(application: Application) : AndroidViewModel(application) {
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val messages: SharedFlow<String> = _messages.asSharedFlow()
 
+    private val bluetooth = BluetoothAudio(application, viewModelScope)
+    val bluetoothState: StateFlow<BluetoothAudio.State> = bluetooth.state
+
     init {
         SoundLab.applySaved(application)
+        bluetooth.start()
     }
+
+    override fun onCleared() {
+        bluetooth.stop()
+    }
+
+    fun selectBluetoothAutomatic() = bluetooth.selectAutomatic()
+    fun selectBluetoothCodec(codec: BluetoothCodecConfig) = bluetooth.selectCodec(codec)
+    fun setBluetoothSampleRate(rate: Int) = bluetooth.setSampleRate(rate)
+    fun setBluetoothBitsPerSample(bits: Int) = bluetooth.setBitsPerSample(bits)
+    fun setBluetoothChannelMode(mode: Int) = bluetooth.setChannelMode(mode)
+    fun setBluetoothLdacQuality(value: Long) = bluetooth.setLdacQuality(value)
+    fun setBluetoothLhdcQuality(value: Int) = bluetooth.setLhdcQuality(value)
+    fun setBluetoothLhdcLowLatency(on: Boolean) = bluetooth.setLhdcLowLatency(on)
+    fun setBluetoothAacVbr(on: Boolean) = bluetooth.setAacVbr(on)
+    fun setBluetoothOptionalCodecs(on: Boolean) = bluetooth.setOptionalCodecs(on)
+    fun refreshBluetooth() = bluetooth.refresh()
 
     private fun update(transform: (SoundLab.Settings) -> SoundLab.Settings) =
         SoundLab.update(getApplication(), transform)
